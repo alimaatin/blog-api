@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\ApiResponseTrait;
+use App\Http\Requests\RegisterRequest;
+use App\Http\Resources\AuthResource;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -10,50 +13,27 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
+    use ApiResponseTrait;
+
     /**
      * Create a user and return a token
      * @unauthenticated
      */
-    public function register(Request $request)
+    public function register(RegisterRequest $request)
     {
-        try {
-            $validated = $request->validate([
-                /**
-                 * @example alimatin
-                 */
-                "username" => "required|string|max:255|unique:users",
-                /**
-                 * @example alimatin
-                 */
-                "displayName" => "required|string|max:255",
-                /**
-                 * @example alimatin@gmail.com
-                 */
-                "email" => "required|string|email|max:255|unique:users",
-                /**
-                 * @example alimatin
-                 */
-                "password" => "required|string|min:8",
-                                /**
-                 * @example alimatin
-                 */
-                "password_confirmation" => "required|string|min:8",
-            ]);
+        $validated = $request->validated();
 
-            $user = User::create([
-                "username" => $validated["username"],
-                "displayName" => $validated["displayName"],
-                "email" => $validated["email"],
-                "password" => Hash::make($validated["password"]),
-            ]);
-        
-            $message = "User created successfully";
-            
-            $token = JWTAuth::fromUser($user);
-            return response()->json(compact('message','token','user'));
-        } catch (JWTException $e) {
-            return response()->json(['message' => 'User creation failed', 'error' => $e->getMessage()], 500);
-        }
+        $user = User::create([$validated]);
+
+        $token = JWTAuth::fromUser($user);
+
+        return $this->successResponse(
+            new AuthResource([
+                "user"=> $user,
+                "token"=> $token
+            ]),
+            200
+        );
     }
 
     /**
