@@ -1,15 +1,22 @@
 <?php
 
-namespace App\Http\Actions\Posts;
+namespace App\Repository;
 
 use App\Models\Post;
 use App\Models\User;
 
-class QueryPostsAction
+class PostRepository
 {
-    public function execute(array $filters)
+    protected $model;
+
+    public function __construct(Post $model)
     {
-        $query = Post::query();
+        $this->model = $model;
+    }
+
+    public function getByFilters(array $filters)
+    {
+        $query = $this->model->query();
 
         if (!empty($filters['user'])) {
             $user = User::where('username', $filters['user'])->first();
@@ -29,6 +36,8 @@ class QueryPostsAction
         $sortOrder = ($filters['sort'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $query->orderBy('created_at', $sortOrder);
 
-        return $query;
+        $result = $query->get();
+
+        return $result;
     }
 }

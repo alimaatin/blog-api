@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\ApiResponseTrait;
 use App\Models\Category;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -9,6 +10,7 @@ use Throwable;
 
 class CategoryController extends Controller
 {
+    use ApiResponseTrait;
     /**
      * Return all Categories
      * @unathenticated
@@ -17,26 +19,21 @@ class CategoryController extends Controller
     {
         try {
             $categories = Category::all();
-            return response()->json($categories, 200);
+            return $this->successResponse($categories, 200);
         } catch (Throwable $e) {
-            return response()->json(["error" => "Error fetching categories"], 500);
+            return $this->errorResponse("Error fetching categories", 500);
         }
     }
-    
+
     /**
      * Return a Category by ID
      * @unathenticated
      * @throws ModelNotFoundException
      */
-    public function find($id)
+    public function find(Category $category)
     {
-        try {
-            $category = Category::findOrFail($id);
-            $category->posts->where("state", "accepted");
-            return response()->json($category, 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(["error" => "Category not found"], 404);
-        }
+        $category->posts->where("state", "accepted");
+        return $this->successResponse($category, 200);
     }
 
     /**
@@ -49,18 +46,18 @@ class CategoryController extends Controller
                 "name" => "required|string|max:255",
                 "parent_id" => "nullable|integer|exists:categories,id",
         ]);
-        
+
         $category = Category::create($validated);
-        return response()->json($category, 201);
+        return $this->successResponse($category, 201);
         } catch (Throwable $e) {
-            return response()->json(["error" => "Error creating category"], 500);
+            return $this->errorResponse("Error creating category", 500);
         }
     }
 
     /**
      * Update a Category
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, Category $category)
     {
         try {
             $validated = $request->validate([
@@ -68,38 +65,33 @@ class CategoryController extends Controller
                 "parent_id" => "nullable|integer|exists:categories,id",
         ]);
 
-        $category = Category::findOrFail($id);
-
-        $changes = array_filter($validated, function ($value, $key) use ($category) {   
+        $changes = array_filter($validated, function ($value, $key) use ($category) {
             return $category->$key !== $value;
         }, ARRAY_FILTER_USE_BOTH);
 
         if (empty($changes)) {
-            return response()->json(["error" => "No changes detected"], 422);
+            return $this->errorResponse("No changes detected", 422);
         }
 
         $category->update($changes);
-            return response()->json(["updated" => array_keys($changes), "category" => $category], 200);
+            return $this->successResponse(["updated" => array_keys($changes), "category" => $category], 200);
         } catch (ModelNotFoundException $e) {
-            return response()->json(["error" => "Category not found"], 404);
+            return $this->errorResponse("Category not found", 404);
         } catch (Throwable $e) {
-            return response()->json(["error" => "Error updating category"], 500);
+            return $this->errorResponse("Error updating category", 500);
         }
     }
 
     /**
      * Delete a Category
      */
-    public function destroy($id)
+    public function destroy(Category $category)
     {
         try {
-            $category = Category::findOrFail($id);
             $category->delete();
-            return response()->json($category, 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(["error" => "Category not found"], 404);
+            return $this->successResponse($category, 200);
         } catch (Throwable $e) {
-            return response()->json(["error" => "Error deleting category"], 500);
+            return $this->errorResponse("Error deleting category", 500);
         }
     }
 

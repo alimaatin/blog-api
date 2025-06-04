@@ -3,14 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\ApiResponseTrait;
-use App\Http\Actions\Posts\QueryPostsAction;
 use App\Http\Resources\PostCollection;
 use App\Http\Resources\PostResource;
-use App\Models\Category;
 use App\Models\Post;
-use App\Models\User;
+use App\Repository\PostRepository;
 use Dedoc\Scramble\Attributes\QueryParameter;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Throwable;
 
@@ -18,9 +15,12 @@ class AdminPostController extends Controller
 {
     use ApiResponseTrait;
 
-    public function __construct(
-        protected QueryPostsAction $queryPostsAction,
-    ){}
+    protected $postRepository;
+
+    public function __construct(PostRepository $postRepository)
+    {
+        $this->postRepository = $postRepository;
+    }
 
     /**
      * Return all Posts
@@ -31,13 +31,13 @@ class AdminPostController extends Controller
     #[QueryParameter('state', description: 'State of the post', type: 'string', default: 'pending', example: 'accepted')]
     public function index(Request $request)
     {
-        $posts = $this->queryPostsAction->execute($request->all());
+        $posts = $this->postRepository->getByFilters($request->all());
         foreach ($posts as $post) {
             $post->user;
             $post->category;
         }
         return $this->successResponse(
-            PostCollection::collection($posts),
+            PostResource::collection($posts),
             200
         );
 
@@ -53,8 +53,6 @@ class AdminPostController extends Controller
             200
         );
     }
-
-    //Could have handled accepting and rejecting another way but I didn't wanna input extra data
 
     /**
      * Accept a pending Post

@@ -27,33 +27,33 @@ Route::controller(AuthController::class)->prefix("auth")->group(function() {
 
 Route::controller(AdminPostController::class)->prefix("admin/posts")->middleware(JWTmiddleware::class)->group(function() {
     Route::get("/", "index");
-    Route::get("/{id}", "find");
-    Route::put("/accept/{id}", "accept");
-    Route::put("/reject/{id}", "reject");
+    Route::get("/{post}", "find");
+    Route::put("/accept/{post}", "accept");
+    Route::put("/reject/{post}", "reject");
 });
 
 Route::controller(PostController::class)->prefix("posts")->group(function() {
     Route::get("/", "index");
-    Route::get("/{id}", "find")->middleware([EnsurePostIsVisible::class]);
+    Route::get("/{post}", "find")->middleware([EnsurePostIsVisible::class]);
     Route::post("/create", "store")->middleware([JWTmiddleware::class]);
-    Route::put("/update/{id}", "update")->middleware([EnsureResourceIsForUser::class, JWTmiddleware::class]);
-    Route::delete("/delete/{id}", "destroy")->middleware([EnsureResourceIsForUser::class, JWTmiddleware::class]);
-    Route::put("/like/{id}", [LikeController::class, "like"])->middleware([JWTmiddleware::class]);
-    Route::put("/dislike/{id}", [LikeController::class, "dislike"])->middleware([JWTmiddleware::class]);
+    Route::put("/update/{post}", "update")->middleware([EnsureResourceIsForUser::class, JWTmiddleware::class]);
+    Route::delete("/delete/{post}", "destroy")->middleware([EnsureResourceIsForUser::class, JWTmiddleware::class]);
+    Route::post("/{id}/vote", "vote")->middleware([JWTmiddleware::class]);
+    Route::get("/{id}/vote", "getVoteStatus")->middleware([JWTmiddleware::class]);
 });
 
 Route::controller(CommentController::class)->prefix("comments")->group(function() {
     Route::get("/", "index")->middleware([AdminMiddleware::class, JWTmiddleware::class]);
-    Route::get("/{postId}", "find")->middleware([EnsurePostIsVisible::class]);
+    Route::get("/{post}", "find")->middleware([EnsurePostIsVisible::class]);
     Route::post("/create", "store")->middleware([JWTmiddleware::class]);
-    Route::put("/update/{id}", "update")->middleware([EnsureResourceIsForUser::class, JWTmiddleware::class]);
-    Route::delete("/delete/{id}", "destroy")->middleware([EnsureResourceIsForUser::class, JWTmiddleware::class]);
+    Route::put("/update/{post}", "update")->middleware([EnsureResourceIsForUser::class, JWTmiddleware::class]);
+    Route::delete("/delete/{post}", "destroy")->middleware([EnsureResourceIsForUser::class, JWTmiddleware::class]);
 });
 
 Route::controller(CategoryController::class)->prefix("categories")->group(function() {
     Route::get("/", "index");
-    Route::get("/{id}", "find");
+    Route::get("/{category}", "find");
     Route::post("/create", "store")->middleware(AdminMiddleware::class);
-    Route::put("/update/{id}", "update")->middleware(AdminMiddleware::class);
-    Route::delete("/delete/{id}", "destroy")->middleware(AdminMiddleware::class);
+    Route::put("/update/{category}", "update")->middleware(AdminMiddleware::class);
+    Route::delete("/delete/{category}", "destroy")->middleware(AdminMiddleware::class);
 });
