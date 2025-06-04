@@ -20,8 +20,8 @@ Alternative installation is possible without local dependencies relying on [Dock
 
 Clone the repository
 ```bash
-  git clone <repo url>
-  cd my-project
+  git clone https://github.com/alimaatin/laravel-blog-api
+  cd laravel-blog-api
 ```
 Install all the dependencies
 ```bash
