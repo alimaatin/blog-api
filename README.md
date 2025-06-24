@@ -1,69 +1,61 @@
-# Laravel Blog API
-> A blog API written in Laravel with JWT authentication and like dislike functionality and an admin panel to accept or reject upcoming posts.
 
----
-# Getting Started
+# Public Blog API
+
+REST API made using Laravel. Primarily for learning purposes. Implements JWT auth & Redis.
+
+
+
 ## Installation
-Please check the official Laravel installation guide before you start. [Official Documentation](https://laravel.com/)
+Alternative installation is possible without local dependencies relying on [Docker](#Docker).
 
 Clone the repository
+```bash
+  git clone <repo url>
+  cd my-project
 ```
-git clone https://github.com/alimaatin/blog-api/
-```
-
-Switch to the repository folder
-```
-cd blog-api
-```
-
-Install all the dependencies using composer
-```
+Install all the dependencies
+```bash
 composer install
+npm install
 ```
-
 Copy the example env file and make the required configuration changes in the .env file
-```
+```bash
 cp .env.example .env
 ```
-
-Create storage link for file uploads
-```
-php artisan storage:link
-```
-
 Generate a new application key
-```
+```bash
 php artisan key:generate
 ```
-
 Generate a new JWT secret
-```
-php artisan jwt:generate
-```
-
-Run the database migrations
-```
-php artisan migrate
-```
-
-Start the local development server
-```
-php artisan serve
-```
-
-**TL;DR command list**
-```
-git clone https://github.com/alimaatin/blog-api/
-cd blog-api
-composer install
-cp .env.example .env
-php artisan storage:link
+```bash
 php artisan key:generate
-php artisan jwt:generate
+```
+Create storage link for file uploads
+```bash
+php artisan storage:link
+```
+Run the database migrations
+```bash
 php artisan migrate
-php artisan serve
+```
+Start the local development server
+```bash
+composer run dev
+```
+Seed the database(optional)
+```bash
+php artisan db:seed
+```
+## Docker
+This Laravel project uses Laravel Sail, a lightweight command-line interface for interacting with Docker. Sail provides a simple starting point for building a Laravel application using PHP, MySQL, and other common services within Docker containers.
+
+To get the project running simply use
+```bash
+./vendor/bin/sail up
+```
+Or in the background
+```bash
+./vendor/bin/sail up -d
 ```
 
-## Documentation
-This app is documented using [Scramble](https://scramble.dedoc.co/)
-
+Once the application's containers have been started, you may access the project in your web browser at: http://localhost.

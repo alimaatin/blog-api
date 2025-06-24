@@ -2,16 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\ApiResponseTrait;
+use App\Http\Requests\StorePostRequest;
+use App\Http\Requests\UpdatePostRequest;
+use App\Http\Resources\PostCollection;
+use App\Http\Resources\PostResource;
 use App\Models\Post;
 use App\Models\User;
+use App\Repository\BaseRepository;
+use App\Repository\PostRepository;
 use Dedoc\Scramble\Attributes\QueryParameter;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Redis;
 use Throwable;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 class PostController extends Controller
 {
+    use ApiResponseTrait;
+
+    protected $postRepository;
+
+    public function __construct(PostRepository $postRepository)
+    {
+        $this->postRepository = $postRepository;
+    }
     /**
      * Return all Posts by filters
      * @unauthenticated
@@ -21,56 +37,30 @@ class PostController extends Controller
     #[QueryParameter('sort', description: 'How you want to sort the content(asc, desc)', type: 'string', default: 'desc', example: 'asc')]
     public function index(Request $request)
     {
-        $query = Post::query();
+        $posts = $this->postRepository->getByFilters($request->all());
 
-        if ($request->has("user")) {
-            $user = User::where("username", $request->user)->first();
-            if ($user) {
-                $query->where("user_id", $user->id);
-            }
-        }
-
-        if ($request->has("search")) {
-            $query->where("title", "like", "%" . $request->search . "%");
-        }
-
-        $query->where("state", "accepted");
-
-        $sortOrder = $request->sort === "asc" ? "asc" : "desc";
-        $query->orderBy("created_at", $sortOrder);
-        
-        $result = $query->get();
-
-        return response()->json($result);
+        return $this->successResponse(PostResource::collection($posts), 200);
     }
 
     /**
      * Create a new Post
      */
-    public function store(Request $request)
+    public function store(StorePostRequest $request)
     {
         try {
-            $validated = $request->validate([
-                "title" => "required|string|max:255",
-                "content" => "required|string",
-                "thumbnail" => "required|image|mimes:jpeg,png,jpg,gif,svg|max:2048",
-                "category_id" => "nullable|integer|exists:categories,id",
-        ]);
+            $validated = $request->validated();
 
-        $validated["user_id"] = JWTAuth::user()->id;
+            $user = auth()->user();
 
-        $path = $request->file("thumbnail")->store("posts", "public");
+            $image = $request->file("thumbnail")->store("posts", "public");
 
-        $validated["thumbnail"] = asset("storage/" . $path);
+            $validated["thumbnail"] = asset("storage/" . $image);
 
-        $post = Post::create($validated);
-        $post->user;
-        $category = $post->category;
-        $category->parent;
+            $post = $user->posts()->create($validated);
 
-            return response()->json(["message" => "Post created","post" => $post], 201);
+            return $this->successResponse(["message" => "Post created","post" => new PostResource($post)], 201);
         } catch (Throwable $e) {
-            return response()->json(["error" => "Error creating post"], 500);
+            return $this->errorResponse("Error creating post", 500);
         }
     }
 
@@ -78,73 +68,95 @@ class PostController extends Controller
      * Return a Post by ID
      * @unauthenticated
      */
-    public function find($id)
+    public function find(Post $post)
     {
-        try {
-            $post = Post::findOrFail($id);
-            $post->user;
-            $category = $post->category;
-            $category->parent;
-
-            return response()->json($post);
-        } catch(ModelNotFoundException $e) {
-            return response()->json(["error" => "Post not found"], 404);
-        }
+        return $this->successResponse(new PostResource($post), 200);
     }
 
     /**
      * Update a Post
      */
-    public function update(Request $request, $id)
+    public function update(UpdatePostRequest $request, Post $post)
     {
         try {
-            $validated = $request->validate([
-                "title" => "nullable|string|max:255",
-                "content" => "nullable|string",
-                "category_id" => "nullable|integer|exists:categories,id",
-            ]);
-    
-            $post = Post::findOrFail($id);
-    
-            $changes = array_filter($validated, function ($value, $key) use ($post) {   
+            $validated = $request->validated();
+
+            $changes = array_filter($validated, function ($value, $key) use ($post) {
                 return $post->$key !== $value;
             }, ARRAY_FILTER_USE_BOTH);
-    
+
             if (empty($changes)) {
-                return response()->json(["error" => "No changes detected"], 422);
+                return $this->errorResponse("No changes detected", 422);
             }
 
             $post->update($changes);
-            $post->user;
-            $category = $post->category;
-            $category->parent;
-    
-            return response()->json(["updated" => array_keys($changes), "post" => $post]);
-    
-        } catch (ModelNotFoundException $e) {
-            return response()->json(["error" => "Post not found"], 404);
+
+            return $this->successResponse(["updated" => array_keys($changes), "post" => new PostResource($post)], 200);
+
         } catch (Throwable $e) {
-            return response()->json(["error" => "Error updating post"], 500);
+            return $this->errorResponse("Error updating post", 500);
         }
     }
-    
+
     /**
      * Delete a Post
      */
-    public function destroy($id)
+    public function destroy(Post $post)
     {
         try {
-            $post = Post::findOrFail($id);
             $post->delete();
-            $post->user;
-            $category = $post->category;
-            $category->parent;
-
-            return response()->json(["message" => "Post deleted", "post" => $post] );
-        } catch(ModelNotFoundException $e) {
-            return response()->json(["error" => "Post not found"], 404);
+            return $this->successResponse(["message" => "Post deleted", new PostResource($post)], 200);
         } catch (Throwable $e) {
-            return response()->json(["error" => "Error deleting post"], 500);
+            return $this->errorResponse("Error deleting post", 500);
         }
     }
+
+    public function vote(Request $request, $id) {
+        $action = $request->input("action");
+        $userId = auth()->id();
+        $likeKey = "post:{$id}:likes";
+        $dislikeKey = "post:{$id}:dislikes";
+        if($action==="like") {
+            Redis::srem($dislikeKey, $userId);
+            Redis::sadd($likeKey, $userId);
+            Redis::zincrby("posts_ranked_by_likes", 1, $id);
+        } elseif($action ==="dislike") {
+            Redis::srem($likeKey, $userId);
+            Redis::sadd($dislikeKey, $userId);
+            Redis::zincrby("posts_ranked_by_likes", -1, $id);
+        } else {
+            return response()->json(['error' => 'invalid action']);
+        }
+        $likesCount = Redis::scard($likeKey);
+        $dislikesCount = Redis::scard($dislikeKey);
+        return response()->json([
+            'likes' => $likesCount,
+            'dislikes' => $dislikesCount
+        ]);
+    }
+
+    public function getVoteStatus($id) {
+        $userId = auth()->id();
+        if(!$userId) {
+            return response()->json(['like'=>false, 'dislike'=>false]);
+        }
+
+        $likeKey = "post:{$id}:likes";
+        $dislikeKey = "post:{$id}:dislikes";
+
+        $likeCount = Redis::scard($likeKey);
+        $dislikeCount = Redis::scard($dislikeKey);
+        $likeStatus = Redis::sismember($likeKey, $userId);
+        $dislikeStatus = Redis::sismember($dislikeKey, $userId);
+
+        return response()->json([
+            'like' => $likeStatus,
+            "dislike" => $dislikeStatus,
+            "likes"=> $likeCount,
+            "dislikes" =>$dislikeCount
+        ]);
+
+    }
+
+
 }

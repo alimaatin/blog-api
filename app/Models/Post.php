@@ -15,8 +15,6 @@ class Post extends Model
         "thumbnail",
         "category_id",
         "state",
-        "likes",
-        "dislikes",
     ];
 
     public function user()
@@ -28,15 +26,10 @@ class Post extends Model
     {
         return $this->belongsTo(Category::class);
     }
-    
+
     public function comments()
     {
         return $this->hasMany(Comment::class);
-    }
-
-    public function likes()
-    {
-        return $this->hasMany(Like::class);
     }
 
 }

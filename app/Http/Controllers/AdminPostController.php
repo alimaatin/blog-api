@@ -2,16 +2,26 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Category;
+use App\ApiResponseTrait;
+use App\Http\Resources\PostCollection;
+use App\Http\Resources\PostResource;
 use App\Models\Post;
-use App\Models\User;
+use App\Repository\PostRepository;
 use Dedoc\Scramble\Attributes\QueryParameter;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Throwable;
 
 class AdminPostController extends Controller
 {
+    use ApiResponseTrait;
+
+    protected $postRepository;
+
+    public function __construct(PostRepository $postRepository)
+    {
+        $this->postRepository = $postRepository;
+    }
+
     /**
      * Return all Posts
      */
@@ -21,97 +31,83 @@ class AdminPostController extends Controller
     #[QueryParameter('state', description: 'State of the post', type: 'string', default: 'pending', example: 'accepted')]
     public function index(Request $request)
     {
-        try {
-            $query = Post::query();
-    
-            if ($request->has("user")) {
-                $user = User::where("username", $request->user)->first();
-                if ($user) {
-                    $query->where("user_id", $user->id);
-                }
-            }
-    
-            if ($request->has("search")) {
-                $query->where("title", "like", "%" . $request->search . "%");
-            }
-
-            if($request->has("state")) {
-                $query->where("state", $request->state);
-            }
-    
-            $sortOrder = $request->sort === "asc" ? "asc" : "desc";
-            $query->orderBy("created_at", $sortOrder);
-
-            $result = $query->get();
-    
-            return response()->json($result);
-        } catch (Throwable $e) {
-            return response()->json(["error" => "Error fetching posts: " . $e->getMessage()], 500);
+        $posts = $this->postRepository->getByFilters($request->all());
+        foreach ($posts as $post) {
+            $post->user;
+            $post->category;
         }
+        return $this->successResponse(
+            PostResource::collection($posts),
+            200
+        );
+
     }
-    
+
     /**
      * Return a Post by ID
      */
-    public function find($id)
+    public function find(Post $post)
     {
-        try {
-            $post = Post::findOrFail($id);
-            return response()->json($post);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(["error" => "Post not found"], 404);
-        } catch (Throwable $e) {
-            return response()->json(["error" => "Error fetching post"], 500);
-        }
+        return $this->successResponse(
+            new PostResource($post->with(['user', 'category'])->get()),
+            200
+        );
     }
 
     /**
      * Accept a pending Post
      */
-    public function accept($id)
+    public function accept(Post $post)
     {
         try {
-            $post = Post::findOrFail($id);
-            $post->state = "accepted";
-            $post->save();
-            return response()->json(["message" => "Post accepted", "post" => $post], 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(["error" => "Post not found"], 404);
+            $post->update(['state' => 'accepted']);
+            return $this->successResponse(
+                new PostResource($post),
+                200
+            );
         } catch (Throwable $e) {
-            return response()->json(["error" => "Error accepting post"], 500);
+            return $this->errorResponse(
+                $e->getMessage(),
+                $e->getCode(),
+            );
         }
     }
 
     /**
      * Reject a pending Post
      */
-    public function reject(Request $request, $id)
+    public function reject(Post $post)
     {
         try {
-            $post = Post::findOrFail($id);
-            $post->state = "rejected";
-            $post->save();
-            return response()->json(["message" => "Post rejected", "post" => $post], 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(["error" => "Post not found"], 404);
+            $post->update(['state' => 'rejected']);
+            return $this->successResponse(
+                new PostResource($post),
+                200
+            );
         } catch (Throwable $e) {
-            return response()->json(["error" => "Error rejecting post"], 500);
+            return $this->errorResponse(
+                $e->getMessage(),
+                $e->getCode(),
+            );
         }
     }
-    
+
     /**
      * Delete a Post
      */
-    public function destroy($id)
+    public function destroy(Post $post)
     {
         try {
-            $post = Post::findOrFail($id);
             $post->delete();
-            return response()->json(["message" => "Post deleted", "post" => $post], 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(["error" => "Post not found"], 404);
+            return $this->successResponse(
+                new PostResource($post),
+                200
+            );
         } catch (Throwable $e) {
-            return response()->json(["error" => "Error deleting post"], 500);
+            return $this->errorResponse(
+                $e->getMessage(),
+                $e->getCode(),
+            );
         }
     }
 }

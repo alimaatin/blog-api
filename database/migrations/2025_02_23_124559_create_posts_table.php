@@ -14,11 +14,9 @@ return new class extends Migration
             $table->string("title");
             $table->string("content");
             $table->string("thumbnail");
-            $table->foreignId("category_id")->constrained("categories")->default(1);
+            $table->foreignId("category_id")->nullable()->constrained("categories")->default(1);
             $table->foreignId("user_id")->constrained("users");
             $table->enum("state", ["pending", "accepted", "rejected"])->default("pending");
-            $table->integer("likes")->default(0);
-            $table->integer("dislikes")->default(0);
             $table->timestamps();
         });
     }
